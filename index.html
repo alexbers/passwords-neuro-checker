@@ -1,0 +1,186 @@
+<head>
+    <meta charset="UTF-8">
+    <title>Neuro password complexity checker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.17.0/dist/tf.min.js" integrity="sha384-w1iDoP15hXimW4VMqcmdhWpR1Kfu99vMQc4AotdBgzhnEFnRzohjfHEdhfi6WHkh" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@3.18.0/dist/tf-backend-wasm.js" integrity="sha384-gCBU8Sdx2aw5DH64PLNW8NUNswEEo8h4EF69XgUT3zOo0kVUzZorRgseUCdCvKXY" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <meta name="viewport" content="width=600px, initial-scale=1.0">
+
+    <script type="text/javascript">
+        // for aborting
+        var ajax_request = null;
+
+        function pass_changed() {
+            var password = $("#password").val()
+            if (password.length > 30) {
+                password = password.substr(0, 30)
+                $("#password").val(password)
+            }
+
+            if (!/^[\x20-\x7e]*$/.test(password)) {
+                $("#pass-title").text("Плохой символ в пароле")
+                $("#pass-subtitle").text("Русские буквы пока не поддерживаются")
+                $("#pass-subsubtitle").text("")
+                $("#pass-comment").text("")
+                $("#tbody").empty()
+                return;
+            }
+
+            if(ajax_request) {
+                ajax_request.abort()
+            }
+
+            ajax_request = $.ajax({
+              url: "check_password",
+              data: {"password": password}
+            }).done(function(data) {
+                if (password) $("#pass-title").text(password)
+                else          $("#pass-title").html("&nbsp;")
+
+                var prob = 1.0
+                var uncutted_prob = 1.0
+
+                // anti-brutforce probability clipping
+                var variants = 95 // ascii
+                if (!/[a-z]/.test(password)) { variants -= 26 }
+                if (!/[A-Z]/.test(password)) { variants -= 26 }
+                if (!/[0-9]/.test(password)) { variants -= 10 }
+                if (!/[^0-9A-Za-z]/.test(password)) { variants -= 95 - 10 - 26 - 26 }
+                if (variants == 0) { variants = 95}
+
+                for(var i = 0; i < password.length; i += 1) {
+                    var part = password.substring(0, i)
+
+                    var cur_prob = data[part][password[i]]
+
+                    uncutted_prob *= cur_prob
+
+                    if(cur_prob < 1.0/variants) {
+                        cur_prob = 1.0/variants
+                    }
+
+                    prob *= cur_prob
+                }
+
+                var secs = 1/prob/1_000_000
+
+                if(secs < 1) {
+                    $("#pass-subtitle").html("Сбрутится <b>мгновенно</b>")
+                } else if(secs < 3600) {
+                    $("#pass-subtitle").html("Сбрутится за <b>" + secs.toFixed(0) + "</b> секунд")
+                } else if(secs < 86400) {
+                    $("#pass-subtitle").html("Сбрутится за <b>" + (secs/3600).toFixed(0) + "</b> часов")
+                } else if(secs < (365.25*86400)) {
+                    $("#pass-subtitle").html("Сбрутится за <b>" + (secs/86400).toFixed(0) + "</b> дней")
+                } else {
+                    $("#pass-subtitle").html("Сбрутится за <b>" + (secs/(365.25*86400)).toFixed(0) + "</b> лет")
+                }
+
+                var complexity = Math.log(1/uncutted_prob) / Math.log(95)
+                $("#pass-subsubtitle").text("Сложность как будто в пароле не " + password.length + " символов, а " + complexity.toFixed(2) + " случайных")
+
+                var required_secs = 86400*30
+
+                var percent = ((Math.log2(secs)/Math.log2(64))/(Math.log2(required_secs)/Math.log2(64)))*100
+                percent = Math.max(percent, password.length < 20 ? 2*password.length: 40+(password.length-20))
+                percent = Math.min(percent, 100)
+                $("#progress").width(percent.toFixed(6)+"%")
+
+                if (percent < 55) {
+                    $("#progress").attr("class","progress-bar bg-danger");
+                    $("#pass-comment").text("Легко угадать").attr("class", "text-danger")
+                } else if (percent < 100) {
+                    $("#progress").attr("class","progress-bar bg-warning");
+                    $("#pass-comment").text("Сложно угадать").attr("class", "text-warning")
+                } else {
+                    $("#progress").attr("class","progress-bar bg-success");
+                    $("#pass-comment").text("Сложно сбрутить по хешу").attr("class", "text-success")
+                }
+
+                var stat = data[password]
+
+                var probs = Object.keys(stat).map(function(key) { return [key, stat[key]]; });
+
+                probs.sort(function(first, second) { return second[1] - first[1] })
+                probs = probs.slice(0, 5)
+
+                $("#tbody").empty()
+                for (var i = 0; i < 5; i += 1) {
+                $("#tbody").append("<tr><td style='text-align: center'>" + probs[i][0] + "</td><td>" + (probs[i][1] * 100).toFixed(0) + "%</td></tr>")
+                }
+
+            });
+        }
+
+    </script>
+
+</head>
+<body class="justify-content-center align-items-center container-fluid" style="max-width: 900px; padding-left: 15px; padding-right: 15px;">
+
+<h1>Нейро-проверятель сложности пароля</h1>
+<div class="card">
+  <div class="card-body clearfix" style="padding-bottom: 0px;">
+    <h5 class="card-title"><span id="pass-title">Тут будет информация</span>
+    </h5>
+
+    <p class="card-text" id="pass-text">
+        <table class="table table-striped" id="table">
+            <thead>
+                <tr>
+                    <th scope="col" width="200px">Следующий символ</th>
+                    <th scope="col">Вероятность</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </p>
+  </div>
+</div>
+<form action="javascript:false;">
+<div class="form-group">
+<label for="password">Пароль</label>
+<input class="form-control" id="password" spellcheck="false" autocomplete="off" placeholder="qwerty" oninput="pass_changed()">
+<small class="form-text text-muted">Не вводите свои настоящие пароли, а то я их увижу</small>
+</div>
+</form>
+<div class="card">
+  <div class="card-body clearfix">
+    <h6 class="card-subtitle mb-2 text-muted" id="pass-subtitle"></h6>
+    <div class="progress" >
+      <div class="progress-bar" style="width: 0%" role="progressbar" id="progress" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+    </div>
+    <div id="pass-comment"></div>
+    <h7 class="card-subtitle mb-2 text-muted" id="pass-subsubtitle"></h7>
+  </div>
+</div>
+<hr>
+<div class="text-justify">
+<h2>Описание</h2>
+<p>
+    Сейчас <b>почти все</b> сайты при регистрации проверяют пароль на сложность по формальным признакам: минимальная длина, используемые классы символов и т.д. Они считают что <i>"sgfdunwerthbcvcbpotgfbjlthf"</i> — слишком простой пароль, а вот <i>"Password123!"</i> — нормальный.
+</p>
+<p>
+    Из-за этого, когда база хешей <b>утекает</b>, ощутимое число паролей оказываются <b>слишком простыми</b> и брутятся по словарям и правилам.
+</p>
+<p>
+    Идея этого сайта — обучить нейронку на утекших прежде паролях, чтобы она говорила простой пароль или сложный. Используется архитектура "трансформер", училось всё на 8 видеокартах Tesla A100 где-то два дня.
+</p>
+
+<p>
+
+</p>
+
+<p>
+    Пожелания, предложения — на <i>bay@hackerdom.ru</i> или <i>@bay3255</i> в тг
+</p>
+</div>
+
+<script>
+    pass_changed()
+    $("#password").focus()
+</script>
+
+
+</body>

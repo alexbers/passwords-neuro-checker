@@ -1,0 +1,9 @@
+version: '2.0'
+services:
+  pass_complexity:
+    build: .
+    network_mode: host
+    volumes:
+      - ./:/home/pass_complexity/
+    # restart: never
+    mem_limit: 2000m
