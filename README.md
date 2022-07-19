@@ -1,6 +1,8 @@
 # passwords-neuro-checker
 The password checker based on GPT3
 
+The pure web version is available on https://alexbers.github.io
+
 ## Run demo ##
 
 ```docker-compose up```
