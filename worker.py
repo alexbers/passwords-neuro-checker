@@ -1,6 +1,5 @@
 import numpy
 import functools
-import sys
 import os
 import re
 
