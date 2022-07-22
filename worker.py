@@ -4,10 +4,10 @@ import os
 import re
 
 from aiohttp import web
-import tensorflow as tf
+import tflite_runtime.interpreter as tflite
 
 CTX_LEN = 32
-MODEL = tf.saved_model.load("model")
+MODEL = tflite.Interpreter(model_path="lite_model/model.tflite")
 
 @functools.lru_cache(maxsize=10000)
 def predict(text):
@@ -15,8 +15,8 @@ def predict(text):
     tokens = [ord(c) for c in text[:CTX_LEN-1]]
     tokens += [0] * (CTX_LEN - len(tokens))
 
-    t = tf.convert_to_tensor([tokens], dtype=numpy.int32)
-    p = MODEL.signatures["serving_default"](input=t)["outputs"][0][0].numpy()
+    f = MODEL.get_signature_runner("serving_default")
+    p = f(input=numpy.array([tokens], dtype=numpy.int32))["outputs"][0][0]
     p = numpy.exp(p) / numpy.sum(numpy.exp(p))
     p[0] = 0.0
     p /= numpy.sum(p)

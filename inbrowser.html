@@ -49,7 +49,7 @@
         }
 
         async function load_network() {
-            tf.setBackend('wasm')
+            await tf.setBackend('wasm')
             const passNet = new PassNet();
             await passNet.load();
             net = passNet;
