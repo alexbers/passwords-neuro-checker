@@ -7,7 +7,7 @@ from aiohttp import web
 import tflite_runtime.interpreter as tflite
 
 CTX_LEN = 32
-MODEL = tflite.Interpreter(model_path="lite_model/model.tflite")
+MODEL = tflite.Interpreter(model_path="../model/lite/model.tflite")
 
 @functools.lru_cache(maxsize=10000)
 def predict(text):
@@ -41,10 +41,10 @@ if __name__ == "__main__":
     app.add_routes([
         web.get('/', lambda r: web.FileResponse("index.html")),
         web.get('/magic', lambda r: web.FileResponse("inbrowser.html")),
-        web.get('/model.json', lambda r: web.FileResponse("web_model/model.json")),
+        web.get('/model.json', lambda r: web.FileResponse("../model/web/model.json")),
         web.get('/check_password', check_password)])
-    for f in os.listdir("web_model"):
+    for f in os.listdir("../model/web"):
         if re.fullmatch(r"group\d+-shard\d+of\d+\.bin", f):
-            app.add_routes([web.get("/" + f, lambda r, f2=f: web.FileResponse("web_model/"+f2))])
+            app.add_routes([web.get("/" + f, lambda r, f2=f: web.FileResponse("../model/web/"+f2))])
 
     web.run_app(app, port=80)

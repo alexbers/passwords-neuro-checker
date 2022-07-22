@@ -5,5 +5,5 @@ RUN pip3 install tflite-runtime
 
 RUN useradd pass_complexity -u 10000 -m
 
-WORKDIR /home/pass_complexity/
+WORKDIR /home/pass_complexity/demo
 CMD ["python3", "worker.py"]
