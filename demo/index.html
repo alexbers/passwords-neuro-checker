@@ -39,32 +39,7 @@
                 if (password) $("#pass-title").text(password)
                 else          $("#pass-title").html("&nbsp;")
 
-                var prob = 1.0
-                var uncutted_prob = 1.0
-
-                // anti-brutforce probability clipping
-                var variants = 95 // ascii
-                if (!/[a-z]/.test(password)) { variants -= 26 }
-                if (!/[A-Z]/.test(password)) { variants -= 26 }
-                if (!/[0-9]/.test(password)) { variants -= 10 }
-                if (!/[^0-9A-Za-z]/.test(password)) { variants -= 95 - 10 - 26 - 26 }
-                if (variants == 0) { variants = 95}
-
-                for(var i = 0; i < password.length; i += 1) {
-                    var part = password.substring(0, i)
-
-                    var cur_prob = data[part][password[i]]
-
-                    uncutted_prob *= cur_prob
-
-                    if(cur_prob < 1.0/variants) {
-                        cur_prob = 1.0/variants
-                    }
-
-                    prob *= cur_prob
-                }
-
-                var secs = 1/prob/1_000_000
+                var secs = data["secs"]
 
                 if(secs < 1) {
                     $("#pass-subtitle").html("Сбрутится <b>мгновенно</b>")
@@ -78,20 +53,14 @@
                     $("#pass-subtitle").html("Сбрутится за <b>" + (secs/(365.25*86400)).toFixed(0) + "</b> лет")
                 }
 
-                var complexity = Math.log(1/uncutted_prob) / Math.log(95)
-                $("#pass-subsubtitle").text("Сложность как будто в пароле не " + password.length + " символов, а " + complexity.toFixed(2) + " случайных")
+                $("#pass-subsubtitle").text("Сложность как будто в пароле не " + password.length + " символов, а " + data["complexity"].toFixed(2) + " случайных")
 
-                var required_secs = 86400*30
+                $("#progress").width(data["percent"].toFixed(6)+"%")
 
-                var percent = ((Math.log2(secs)/Math.log2(64))/(Math.log2(required_secs)/Math.log2(64)))*100
-                percent = Math.max(percent, password.length < 20 ? 2*password.length: 40+(password.length-20))
-                percent = Math.min(percent, 100)
-                $("#progress").width(percent.toFixed(6)+"%")
-
-                if (percent < 55) {
+                if (data["percent"] < 55) {
                     $("#progress").attr("class","progress-bar bg-danger");
                     $("#pass-comment").text("Легко угадать").attr("class", "text-danger")
-                } else if (percent < 100) {
+                } else if (data["percent"] < 100) {
                     $("#progress").attr("class","progress-bar bg-warning");
                     $("#pass-comment").text("Сложно угадать").attr("class", "text-warning")
                 } else {
@@ -99,10 +68,9 @@
                     $("#pass-comment").text("Сложно сбрутить по хешу").attr("class", "text-success")
                 }
 
-                var stat = data[password]
+                var stat = data["probs"][password]
 
                 var probs = Object.keys(stat).map(function(key) { return [key, stat[key]]; });
-
                 probs.sort(function(first, second) { return second[1] - first[1] })
                 probs = probs.slice(0, 5)
 
@@ -110,7 +78,6 @@
                 for (var i = 0; i < 5; i += 1) {
                 $("#tbody").append("<tr><td style='text-align: center'>" + probs[i][0] + "</td><td>" + (probs[i][1] * 100).toFixed(0) + "%</td></tr>")
                 }
-
             });
         }
 
