@@ -1,14 +1,13 @@
 import os
 import re
-import functools
 
 from aiohttp import web
 
 import neuro_pass_checker
 
-async def web_check_password(request, brute_speed=1_000_000, good_brute_duration=86400*30):
+async def web_check_password(request):
     password = request.query.get('password', "")
-    return web.json_response(neuro_pass_checker.check_password(password, brute_speed, good_brute_duration))
+    return web.json_response(neuro_pass_checker.check_password(password))
 
 if __name__ == "__main__":
     app = web.Application()
